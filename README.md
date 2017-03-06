@@ -1,2 +1,0 @@
-# algomusic
-AI Project
