@@ -22,11 +22,18 @@ CHROMATIC_PENALTY = {
 C_MAJ = HarmonyChord(name='C', notes=['c3', 'e3', 'g3', 'c4'])
 G_MAJ = HarmonyChord(name='G', notes=["g2", "b2", "d3", "g3"])
 A_MIN = HarmonyChord(name='Am', notes=["a2", "c3", "e3", "a3"])
+B_MIN = HarmonyChord(name='Bm', notes=["b2", "d3", "f#3", "b3"])
+D_MAJ = HarmonyChord(name='D', notes=["d3", "f#3", "a3", "d4"])
 E_MIN = HarmonyChord(name='Em', notes=["e3", "g3", "b3", "e4"])
 F_MAJ = HarmonyChord(name='F', notes=["f2", "a2", "c3", "f3"])
+F_SHARP_MIN = HarmonyChord(name='F#m', notes=["f#2", "a2", "c#3", "f#3"])
 
 ALL_CHORDS = [
-  C_MAJ, G_MAJ, A_MIN, E_MIN, F_MAJ,
+  C_MAJ, G_MAJ, A_MIN, B_MIN, D_MAJ, E_MIN,
+]
+
+ALL_CHORDS_MIN = [
+  C_MAJ, G_MAJ, A_MIN, B_MIN, D_MAJ, E_MIN, F_SHARP_MIN
 ]
 
 
