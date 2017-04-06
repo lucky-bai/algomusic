@@ -1,4 +1,5 @@
 import argparse
+import sys
 
 import music21
 from music21 import converter
@@ -48,17 +49,27 @@ print('Algorithm: {}, Melody: {}, Series: {}'.format(args.algorithm, args.melody
 
 # Pick melody
 if args.melody == 'little_happiness':
+    melody = converter.parse(A_LITTLE_HAPPINESS)
+elif args.melody == 'jj_lin':
     melody = converter.parse(JJ_LIN_MELODY)
 else:
-    melody = converter.parse(A_LITTLE_HAPPINESS)
+    print('Unrecognized melody: should be jj_lin or little_happiness')
+    sys.exit(1)
+
+if args.series not in ('major', 'minor'):
+    print('Unrecognized series: should be major or minor')
+    sys.exit(1)
 
 melody.insert(0, MetronomeMark(number=95))
 
 # Pick algorithm
 if args.algorithm == 'basic':
     chord_search.run(chords, melody, args.series)
-else:
+elif args.algorithm == 'hmm':
     viterbi.run(chords, melody, args.series)
+else:
+    print('Unrecognized algorithm: should be basic or hmm')
+    sys.exit(1)
 
 # Combine two parts
 song = Stream()
