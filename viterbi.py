@@ -3,15 +3,32 @@ from __future__ import division
 import operator
 
 import music21
-from music21 import converter
-from music21.tempo import MetronomeMark
 from music21.chord import Chord
 from music21.note import Note
-from music21.duration import Duration
-from music21.stream import Stream
 from music21.interval import notesToChromatic
 
-from chord_search import ALL_CHORDS, ALL_CHORDS_MIN
+from chord_search import ALL_CHORDS, ALL_CHORDS_MIN, CHROMATIC_PENALTY, WHOLE_NOTE
+
+
+# Initialization probabilities for major and minor chords
+INIT_PROBS = [0, 1, 0, 0, 0, 0]
+INIT_PROBS_MIN = [0, 0, 0, 0, 0, 1, 0]
+
+def goodness(chord, bar_notes):
+    score = 0
+    for note1 in chord.notes[:-1]:
+        note1 = Note(note1)
+        for note2 in bar_notes:
+            chromatic_distance = notesToChromatic(note1, note2).semitones
+
+            # Normalize distance to be between 0 and 6
+            chromatic_distance = chromatic_distance % 12
+            if chromatic_distance > 6:
+              chromatic_distance = 12 - chromatic_distance
+
+            score += CHROMATIC_PENALTY[chromatic_distance]
+
+    return 1 / max(1, score)
 
 
 def viterbi(states, obs, init_probs, trans_probs, emit_fn):
@@ -48,72 +65,23 @@ def viterbi(states, obs, init_probs, trans_probs, emit_fn):
     return max_prob, path
 
 
-CHROMATIC_PENALTY = {
-  0: 0,
-  1: 2,
-  2: 1,
-  3: 0,
-  4: 0,
-  5: 0,
-  6: 2,
-}
-
-def goodness(chord, bar_notes):
-    score = 0
-    for note1 in chord.notes[:-1]:
-        note1 = Note(note1)
-        for note2 in bar_notes:
-            chromatic_distance = notesToChromatic(note1, note2).semitones
-
-            # Normalize distance to be between 0 and 6
-            chromatic_distance = chromatic_distance % 12
-            if chromatic_distance > 6:
-              chromatic_distance = 12 - chromatic_distance
-
-            score += CHROMATIC_PENALTY[chromatic_distance]
-
-    print('Chord', chord.name)
-    print(bar_notes)
-    print('uninverted score', score)
-    return 1 / max(1, score)
-
-
-if __name__ == '__main__':
-    # If Only by JJ Lin
-    JJ_LIN_MELODY = """
-    tinynotation: 4/4
-    r2 r8 G8 e8 d8     e2 e8 d8 e8 c8     B8 g8 g4 e8 d8 e8 c8
-    A4 a4 g8 f8 e8 f8     e2 e8 d8 e8 c8    A4 a4 g8 f8 e8 f8
-    g2~ g8 c16 d16 e8 d8    e8 c16 d16 e8 d8 e8 c16 d16 e8 d8
-    f1
-    """
-
-
-    XIAO_XIN_YUN_MELODY = """
-    tinynotation: 4/4
-    r2 b8 a8 g8 f#8    e8 e8 e8 e8 e8 b4 b8    a2 a8 g8 f#8 e8
-    d8 d8 d8 d8 d8 a4 a8    g1
-    """
-
-    WHOLE_NOTE = Duration(4.0)
-
-    melody = converter.parse(XIAO_XIN_YUN_MELODY)
-    melody.insert(0, MetronomeMark(number=95))
-
+def run(chords, melody, series):
     all_notes = []
-    # Insert a chord for each measure
+    # Construct music21 notes, grouped into measures
     for measure in filter(lambda x: isinstance(x, music21.stream.Measure), melody.elements):
         measure_notes = []
         for note in filter(lambda x: isinstance(x, music21.note.Note), measure.elements):
             measure_notes.append(note)
         all_notes.append(measure_notes)
 
-    init_probs = [0, 1, 0, 0, 0, 0]
-    init_probs_min = [0, 0, 0, 0, 0, 1, 0]
+    init_probs = INIT_PROBS if series == 'major' else INIT_PROBS_MIN
+
+    # Build transition matrix where probability of self-transition is low
+    all_chords = ALL_CHORDS if series == 'major' else ALL_CHORDS_MIN
     trans_probs = []
-    for i in range(len(ALL_CHORDS_MIN)):
+    for i in range(len(all_chords)):
         trans_prob = []
-        for j in range(len(ALL_CHORDS_MIN)):
+        for j in range(len(all_chords)):
             if i != j:
                 trans_prob.append(3)
             else:
@@ -122,31 +90,8 @@ if __name__ == '__main__':
         s = sum(trans_prob)
         trans_probs.append(map(lambda x: x / s, trans_prob))
 
-    prob, chord_seq = viterbi(ALL_CHORDS_MIN, all_notes, init_probs_min, trans_probs, goodness)
+    prob, chord_seq = viterbi(all_chords, all_notes, init_probs, trans_probs, goodness)
 
-    chords = converter.parse("""tinynotation: 4/4""")
     for chord in chord_seq:
         chords.append(Chord(chord.notes, duration=WHOLE_NOTE))
         print(chord.name)
-
-    # Combine two parts
-    song = Stream()
-    song.insert(0, melody)
-    song.insert(0, chords)
-
-    song.show('midi')
-
-    # print('Run wikipedia example as test')
-    # observations_space = ['normal', 'cold', 'dizzy']
-    # observations = ['normal', 'cold', 'dizzy']
-    # states = ['Healthy', 'Fever']
-    # init_probs = [0.6, 0.4]
-    # trans_probs = [[0.7, 0.3], [0.4, 0.6]]
-    # def emit_fn(state, obs):
-    #     vals = {'Healthy': {'normal': 0.5, 'cold': 0.4, 'dizzy': 0.1},
-    #             'Fever': {'normal': 0.1, 'cold': 0.3, 'dizzy': 0.6}}
-    #     return vals[state][obs]
-    #
-    # seq_prob, seq = viterbi(states, observations, init_probs, trans_probs, emit_fn)
-    # print('Most like sequence is', seq)
-    # print('This sequence has probability', seq_prob)

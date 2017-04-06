@@ -1,24 +1,27 @@
 from collections import namedtuple
 
+import music21
+from music21.chord import Chord
 from music21.note import Note
+from music21.duration import Duration
 from music21.interval import notesToChromatic
 
 # Cannot use name 'Chord', already taken
 HarmonyChord = namedtuple('HarmonyChord', ['name', 'notes'])
 
+WHOLE_NOTE = Duration(4.0)
 
 # How bad a interval sounds (given number of semitones)
 CHROMATIC_PENALTY = {
   0: 0,
-  1: -2,
-  2: -1,
+  1: 2,
+  2: 1,
   3: 0,
   4: 0,
   5: 0,
-  6: -2,
+  6: 2,
 }
 
-# Todo: add more chords
 C_MAJ = HarmonyChord(name='C', notes=['c3', 'e3', 'g3', 'c4'])
 G_MAJ = HarmonyChord(name='G', notes=["g2", "b2", "d3", "g3"])
 A_MIN = HarmonyChord(name='Am', notes=["a2", "c3", "e3", "a3"])
@@ -37,11 +40,11 @@ ALL_CHORDS_MIN = [
 ]
 
 
-def chord_search(notes):
+def chord_search(notes, candidates):
   """Attempt to find the best chord to match a set of notes"""
-  best_chord, best_score = C_MAJ, -1000
+  best_chord, best_score = C_MAJ, 1000
 
-  for chord in ALL_CHORDS:
+  for chord in candidates:
     chord_score = 0
     for note1 in chord.notes:
       note1 = Note(note1)
@@ -55,9 +58,19 @@ def chord_search(notes):
 
         chord_score += CHROMATIC_PENALTY[chromatic_distance]
 
-    if chord_score > best_score:
+    if chord_score < best_score:
       best_score = chord_score
       best_chord = chord
 
-  print best_chord.name
+  print(best_chord.name)
   return best_chord
+
+
+def run(chords, melody, series):
+  candidates = ALL_CHORDS if series == 'major' else ALL_CHORDS_MIN
+  # Insert a chord for each measure
+  for measure in filter(lambda x: isinstance(x, music21.stream.Measure), melody.elements):
+    measure_notes = []
+    for note in filter(lambda x: isinstance(x, music21.note.Note), measure.elements):
+      measure_notes.append(note)
+    chords.append(Chord(chord_search(measure_notes, candidates).notes, duration=WHOLE_NOTE))

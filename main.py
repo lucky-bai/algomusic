@@ -1,14 +1,12 @@
+import argparse
+
 import music21
 from music21 import converter
 from music21.tempo import MetronomeMark
-from music21.chord import Chord
-from music21.note import Rest
-from music21.note import Note
-from music21.duration import Duration
 from music21.stream import Stream
-from music21.interval import notesToChromatic
 
-from chord_search import *
+import chord_search
+import viterbi
 
 # If Only by JJ Lin
 JJ_LIN_MELODY = """
@@ -19,7 +17,12 @@ g2~ g8 c16 d16 e8 d8    e8 c16 d16 e8 d8 e8 c16 d16 e8 d8
 f1
 """
 
-WHOLE_NOTE = Duration(4.0)
+# A Little Happiness by Hebe Tien
+A_LITTLE_HAPPINESS = """
+tinynotation: 4/4
+r2 b8 a8 g8 f#8    e8 e8 e8 e8 e8 b4 b8    a2 a8 g8 f#8 e8
+d8 d8 d8 d8 d8 a4 a8    g1
+"""
 
 chords = converter.parse("""tinynotation: 4/4""")
 """
@@ -34,21 +37,33 @@ chds.append(Chd(F_MAJ, duration=WHOLE_NOTE))
 chds.append(Chd(G_MAJ, duration=WHOLE_NOTE))
 """
 
-melody = converter.parse(JJ_LIN_MELODY)
+# Parse command line arguments
+parser = argparse.ArgumentParser(description='Find sequence of harmonizing chord progression.')
+parser.add_argument('--algorithm', type=str, default='hmm', help='algorithm to use: basic or hmm')
+parser.add_argument('--melody', type=str, default='jj_lin', help='jj_lin or little_happiness')
+parser.add_argument('--series', type=str, default='major', help='major or minor')
+args = parser.parse_args()
+
+print('Algorithm: {}, Melody: {}, Series: {}'.format(args.algorithm, args.melody, args.series))
+
+# Pick melody
+if args.melody == 'little_happiness':
+    melody = converter.parse(JJ_LIN_MELODY)
+else:
+    melody = converter.parse(A_LITTLE_HAPPINESS)
+
 melody.insert(0, MetronomeMark(number=95))
 
-# Insert a chord for each measure
-for measure in filter(lambda x: isinstance(x, music21.stream.Measure), melody.elements):
-  measure_notes = []
-  for note in filter(lambda x: isinstance(x, music21.note.Note), measure.elements):
-    measure_notes.append(note)
-  chords.append(Chord(chord_search(measure_notes).notes, duration=WHOLE_NOTE))
-
+# Pick algorithm
+if args.algorithm == 'basic':
+    chord_search.run(chords, melody, args.series)
+else:
+    viterbi.run(chords, melody, args.series)
 
 # Combine two parts
 song = Stream()
 song.insert(0, melody)
 song.insert(0, chords)
 
-#song.show('midi')
-#song.show()
+# song.show('midi')
+song.show()
